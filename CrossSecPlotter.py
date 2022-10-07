@@ -1,4 +1,5 @@
 import os
+from typing import Iterable, List
 import matplotlib.pyplot as plt
 plt.rcParams['figure.dpi']=200
 import numpy as np
@@ -16,8 +17,19 @@ class Bound2D:
     ylabel: str = "y"
 
 def plot_4D_CS(func, z_plot, z_label='z', bound2D=Bound2D(), wbounds=None, color_num=21, path=None, func_name=None):
-    # plot a 4D function w(x,y,z) at z=z_plot with a countour plot with a certain color scheme
-    # if wbounds is not fixed then will be auto-fitted
+    """Plot a 4D function w(x,y,z) at z=z_plot with a countour plot.
+
+    Args:
+        func: function to plot
+        bound2D: Class Bound2D object.
+        wbounds: bounds on the w axis (color dimension). If not provided with be auto fitted.
+        color_num: Number of colors to be used for countour plot. Defaults to 21.
+        path: Path to save the generated plot. Defaults to None.
+        func_name: Name to be displayed in the title of the plot
+
+    Returns:
+        None
+    """
     xmin, xmax = bound2D.xmin, bound2D.xmax
     ymin, ymax = bound2D.ymin, bound2D.ymax
     x = np.linspace(xmin, xmax, color_num)
@@ -42,7 +54,7 @@ def plot_4D_CS(func, z_plot, z_label='z', bound2D=Bound2D(), wbounds=None, color
     plt.title(title_str)
     
     if path == None:
-        save_path = "Figures/GPRplots/test/"
+        save_path = "Figures/test/"
     else:
         save_path = path
         save_path += '/' if path[-1]!= '/' else ''
@@ -55,21 +67,22 @@ def plot_4D_CS(func, z_plot, z_label='z', bound2D=Bound2D(), wbounds=None, color
     plt.show() if path==None else plt.close()
     return filename
 
-def plot_4D(func, z_values, path=None, func_name=None, z_label='z', save_images=True, color_num = 21, wbounds=(0, 170), bound2D=Bound2D(), fps=1):
-    """
-    Plot a 4D function w(x,y,z) by z crosssections.
+def plot_4D(func:function, z_values, path=None, func_name=None, z_label='z', save_images=True, color_num = 21, wbounds=(0, 170), bound2D=Bound2D(), fps=1):
+    """Plot a 4D function w(x,y,z) by z crosssections.
 
-    :param z_values: values of z at cross sections we want to plot at
-    :param path: path 
-    :param func_name: name of the 4D function we are plotting
-    :param z_label: label on the z axis
-    :param save_images: if true then save the cross section png files
-    :param color_num: how many colors used in counter plot
-    :param w_bound: bounds on w to plot
-    :param fps: frames per second used in gif
-    """
+    Args:
+        func (function): Function to plot.
+        z_values: Values of z at cross sections we want to plot at.
+        func_name: Name of the 4D function we are plotting
+        z_label (str, optional): Label on the z axis. Defaults to 'z'.
+        save_images (bool, optional): If true then save the cross section png files. Defaults to True.
+        fps: Frames per second used in gif. Defaults to 1.
+
+    Returns:
+        _type_: _description_
+    """    
     if path==None:
-        path = os.getcwd() + "\test"
+        path = os.getcwd() + "/test"
     filenames = []
     for z in z_values:
         fn = plot_4D_CS(func, z, func_name=func_name, z_label=z_label, wbounds=wbounds, color_num=color_num, path=path, bound2D=bound2D)
