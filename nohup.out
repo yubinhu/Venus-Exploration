@@ -2351,3 +2351,23 @@ numpy.linalg.LinAlgError: ("The kernel, Matern(length_scale=10, nu=60), is not r
  0.18985674 0.17715575 0.17147055 0.16825294 0.16618418 0.16474256
  0.16368057        nan        nan        nan]
   warnings.warn(
+usage: BayesOptPS.py [-h] [--run_num RUN_NUM]
+BayesOptPS.py: error: unrecognized arguments: 1
+Traceback (most recent call last):
+  File "/home/harvey_hu/Venus-Exploration/Scripts/BayesOptPS.py", line 20, in <module>
+    X, y, X_var = loadXy("../New Data/accumulated_weekend_data.h5", run_idx=exp_num)
+  File "/home/harvey_hu/Venus-Exploration/VenusOpt/utils.py", line 41, in loadXy
+    accumulated_data = pd.read_hdf(data_dir, "data")
+  File "/home/harvey_hu/anaconda3/lib/python3.9/site-packages/pandas/io/pytables.py", line 427, in read_hdf
+    raise FileNotFoundError(f"File {path_or_buf} does not exist")
+FileNotFoundError: File ../New Data/accumulated_weekend_data.h5 does not exist
+  0%|          | 0/10 [00:00<?, ?it/s] 10%|█         | 1/10 [01:11<10:44, 71.60s/it] 20%|██        | 2/10 [02:24<09:39, 72.46s/it] 30%|███       | 3/10 [03:40<08:39, 74.23s/it] 40%|████      | 4/10 [05:13<08:08, 81.46s/it] 50%|█████     | 5/10 [06:44<07:05, 85.04s/it] 60%|██████    | 6/10 [07:50<05:13, 78.36s/it] 70%|███████   | 7/10 [08:55<03:41, 73.90s/it] 80%|████████  | 8/10 [10:00<02:22, 71.33s/it] 90%|█████████ | 9/10 [11:09<01:10, 70.52s/it]  0%|          | 0/10 [00:00<?, ?it/s]  0%|          | 0/10 [00:00<?, ?it/s]100%|██████████| 10/10 [12:35<00:00, 75.29s/it]100%|██████████| 10/10 [12:35<00:00, 75.56s/it]
+usage: BayesOptPS.py [-h] [--run_num RUN_NUM] [--n N]
+BayesOptPS.py: error: unrecognized arguments: 300
+ 10%|█         | 1/10 [09:28<1:25:12, 568.09s/it] 10%|█         | 1/10 [10:27<1:34:09, 627.77s/it] 20%|██        | 2/10 [18:25<1:13:21, 550.14s/it] 20%|██        | 2/10 [20:44<1:22:51, 621.47s/it]Traceback (most recent call last):
+  File "/home/harvey_hu/Venus-Exploration/Scripts/BayesOptPS.py", line 24, in <module>
+    X, y, X_var = loadXy("New Data/accumulated_weekend_data.h5", run_idx=exp_num)
+  File "/home/harvey_hu/Venus-Exploration/VenusOpt/utils.py", line 45, in loadXy
+    bounds = cuts[run_idx]
+KeyError: '13'
+  0%|          | 0/10 [00:00<?, ?it/s]
