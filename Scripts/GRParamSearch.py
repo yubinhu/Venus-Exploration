@@ -3,11 +3,8 @@ import pandas as pd
 import numpy as np
 
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
 from sklearn.gaussian_process.kernels import RBF, Matern, ConstantKernel
 from sklearn.model_selection import GridSearchCV
-from sklearn_evaluation import plot
-import sklearn
 
 
 RANDSTATE = 42
@@ -64,12 +61,12 @@ def loadXy(data_dir, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_m
 
     return X, y, X_var
 
-X, y, X_var = loadXy("../New Data/accumulated_weekend_data.h5")
+X, y, X_var = loadXy("New Data/accumulated_weekend_data.h5", run_idx="3")
 
 
 # hyper parameters
 param_grid = [
-  {'kernel__length_scale':[0.8, 1.0], 'kernel__nu':[0.66, 0.86]},
+  {'kernel__length_scale':list(np.linspace(0.1, 10, 100)), 'kernel__nu':list(np.linspace(0.5, 3, 100))},
 ]
 
 kernel = Matern(length_scale_bounds="fixed") 
@@ -82,6 +79,6 @@ gpr = GaussianProcessRegressor(
 
 clf = GridSearchCV(estimator=gpr, param_grid=param_grid)
 clf.fit(X, y)
-with open("../Results/gs_clf.dump" , "wb") as f:
+with open("Results/gs_clf_trial3.dump" , "wb") as f:
     pickle.dump(clf, f)
 
