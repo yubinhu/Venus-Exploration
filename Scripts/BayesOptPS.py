@@ -1,6 +1,6 @@
 # run this script from root directory
 from VenusOpt.simulator import Venus
-from VenusOpt.utils import get_scalar, loadXy
+from VenusOpt.utils import get_scaler, loadXy
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.model_selection import cross_validate
 from sklearn.utils import shuffle
@@ -13,7 +13,7 @@ from bayes_opt import BayesianOptimization, UtilityFunction
 
 # handle command line inputs
 parser = argparse.ArgumentParser()
-parser.add_argument('--run_num', type=str) 
+parser.add_argument('--run_num', type=str, default='1')
 parser.add_argument('--n', type=int, default=10) 
 args = parser.parse_args()
 params = vars(args)
@@ -28,10 +28,10 @@ gpr = GaussianProcessRegressor(
     alpha=X_var.mean(), n_restarts_optimizer=9
 ).fit(X, y)
 
-x_scalar = get_scalar()
+x_scaler = get_scaler()
 
 #TODO: check why we need this minus sign here
-unnormalized_gpr = lambda arr: (gpr.predict((arr * x_scalar).reshape(1,-1)) * 1000000)[0]
+unnormalized_gpr = lambda arr: (gpr.predict((x_scaler(arr)).reshape(1,-1)) * 1000000)[0]
 venus = Venus(jitter=0.15, func=unnormalized_gpr)
 
 pbounds = {"A": [97, 110], "B": [97, 110], "C": [116, 128]}

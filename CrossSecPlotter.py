@@ -67,7 +67,7 @@ def plot_4D_CS(func, z_plot, z_label='z', bound2D=Bound2D(), wbounds=None, color
     plt.show() if path==None else plt.close()
     return filename
 
-def plot_4D(func:function, z_values, path=None, func_name=None, z_label='z', save_images=True, color_num = 21, wbounds=(0, 170), bound2D=Bound2D(), fps=1):
+def plot_4D(func, z_values, path=None, func_name=None, z_label='z', save_images=True, color_num = 21, wbounds=(0, 170), bound2D=Bound2D(), fps=1):
     """Plot a 4D function w(x,y,z) by z crosssections.
 
     Args:

@@ -52,6 +52,11 @@ class Venus:
         """Read the current value of the beam current"""
         return self.func(self.currents)
 
+    def bbf(self, A, B, C):
+        self.set_mag_currents(A, B, C)
+        v = self.get_beam_current()
+        return v
+
     @staticmethod
     def _simple_square(w, x, y):
         """A not so funky 3 dimensional parameter space with a single minima."""

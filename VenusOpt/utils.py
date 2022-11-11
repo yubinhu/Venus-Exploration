@@ -1,19 +1,50 @@
 import pandas as pd
 import numpy as np
+from VenusOpt.simulator import Venus
 
 RANDSTATE = 42
 
-def get_scalar(xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"]):
-    x_scaler_dict = {
-        "inj_i_mean": 1 / (130-117),
-        "ext_i_mean": 1 / (110-97),
-        "mid_i_mean": 1 / (110-95)
+RBF_BEST_PARAMS = {
+    '1':{"kernel__length_scale": 0.728}, 
+    '2':{"kernel__length_scale": 0.728}, 
+    '3':{"kernel__length_scale": 0.728}
     }
-    x_scalar = np.array([x_scaler_dict[s] for s in xcolumns])
-    return x_scalar
+
+def get_scaler(xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], use_datanorm=False):
+    norm = {
+        'inj_i_mean': lambda x: (x - 116.38956255790515) / (130.30950340857873 - 116.38956255790515),
+        'ext_i_mean': lambda x: (x - 96.14013084998497) / (110.50552720289964 - 96.14013084998497),
+        'mid_i_mean': lambda x: (x - 93.90183492807242) / (110.00092041798128 - 93.90183492807242),
+        'gas_balzer_2_mean': lambda x: (x - 10.510574340820312) / (14.524067976535894 - 10.510574340820312),
+        'bias_v_mean': lambda x: (x - 9.06360577314328) / (154.53849244729068 - 9.06360577314328),
+    }
+    
+    norm_from_data = {
+        'inj_i_mean': lambda x: (x - 122.59401936) / 3.34305675,
+        'ext_i_mean': lambda x: (x - 104.08696283) / 3.45653727,
+        'mid_i_mean': lambda x: (x - 102.52640418) / 3.00584971,
+        # 'gas_balzer_2_mean': lambda x: (x - 10.510574340820312) / (14.524067976535894 - 10.510574340820312),
+        # 'bias_v_mean': lambda x: (x - 9.06360577314328) / (154.53849244729068 - 9.06360577314328),
+    }
+    
+    def x_scaler(X):
+        # X: ndarray with shape (N, d) or (N, )
+        if len(X.shape)==1:
+            X = X[None, :]
+        N, d = X.shape
+        assert d==len(xcolumns), "Input has feature dimension %d instead of %d"%(X.shape[1], len(xcolumns))
+        X_scaled = np.zeros_like(X)
+        for i in range(d):
+            if not use_datanorm:
+                X_scaled[:, i] = norm[xcolumns[i]](X[:, i])
+            else:
+                X_scaled[:, i] = norm_from_data[xcolumns[i]](X[:, i])
+        return X_scaled
+        
+    return x_scaler
 
 # full script for loadXy
-def loadXy(data_dir, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], ycolumns=["fcv1_i_mean"]):
+def loadXy(data_dir, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], ycolumns=["fcv1_i_mean"], use_datanorm=False):
     """
     Utility function for the specific data format. Load and scale. 
     :param data_dir: directory to the data files
@@ -35,7 +66,7 @@ def loadXy(data_dir, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_m
         "7.5": (1664737000, 1664810000),  # bias_v, gas_balzer_2
         "8": (1665180000, 1665405000),  # bias_v, gas_balzer_2
     }
-    x_scalar = get_scalar(xcolumns)
+    x_scaler = get_scaler(xcolumns, use_datanorm=use_datanorm)
 
     # reading data
     accumulated_data = pd.read_hdf(data_dir, "data")
@@ -46,7 +77,7 @@ def loadXy(data_dir, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_m
     run_data = data[(data["unix_epoch_milliseconds_mean"]/1000 > bounds[0]) & (data["unix_epoch_milliseconds_mean"]/1000 <= bounds[1])]
     run_data.describe()
 
-    X = np.array(run_data[xcolumns]) * x_scalar
+    X = x_scaler(np.array(run_data[xcolumns]))
     y = np.array(run_data[ycolumns]).squeeze()
     X_var = (np.array(run_data[x_std_columns]) ** 2).sum(axis=1) # X_var = X1_std**2 + X2_std**2 + ...
 
@@ -56,3 +87,10 @@ def loadXy(data_dir, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_m
     assert(X.shape[0]==X_var.shape[0])
 
     return X, y, X_var
+
+# converters
+def gpr_to_venus(gpr, x_scaler, jitter=0.15):
+    # Turns a normalized gpr into venus object. 
+    unnormalized_gpr = lambda arr: (gpr.predict((x_scaler(arr)).reshape(1,-1)) * 1e6)[0]
+    venus = Venus(jitter=jitter, func=unnormalized_gpr)
+    return venus

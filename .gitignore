@@ -2,6 +2,7 @@
 *.csv
 *.png
 *.DS_Store
+!Graphs/*
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
