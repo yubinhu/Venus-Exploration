@@ -1,6 +1,7 @@
 # run this script from root directory
 from VenusOpt.simulator import Venus
-from VenusOpt.utils import get_scaler, loadXy
+from VenusOpt.utils import get_scaler, loadXy, RBF_BEST_PARAMS, gpr_to_venus
+from sklearn.gaussian_process.kernels import RBF
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.model_selection import cross_validate
 from sklearn.utils import shuffle
@@ -8,6 +9,7 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import argparse
+import pickle
 
 from bayes_opt import BayesianOptimization, UtilityFunction
 
@@ -21,29 +23,20 @@ params = vars(args)
 exp_num = params['run_num']
 n = params['n']
 
-X, y, X_var = loadXy("New Data/accumulated_weekend_data.h5", run_idx=exp_num)
+X, y, X_var = loadXy("New Data/accumulated_weekend_data.h5", 
+                     run_idx=exp_num, use_datanorm=True)
 X, y = shuffle(X, y)
 
 gpr = GaussianProcessRegressor(
-    alpha=X_var.mean(), n_restarts_optimizer=9
-).fit(X, y)
+    kernel=RBF(length_scale_bounds="fixed") , alpha=X_var.mean(), optimizer=None
+)
 
-x_scaler = get_scaler()
+gpr.set_params(**RBF_BEST_PARAMS[exp_num])
+gpr.fit(X, y)
 
-#TODO: check why we need this minus sign here
-unnormalized_gpr = lambda arr: (gpr.predict((x_scaler(arr)).reshape(1,-1)) * 1000000)[0]
-venus = Venus(jitter=0.15, func=unnormalized_gpr)
+venus = gpr_to_venus(gpr, get_scaler())
 
 pbounds = {"A": [97, 110], "B": [97, 110], "C": [116, 128]}
-
-def get_black_box_func(venus):
-    # Define the black box function to optimize.
-    def black_box_function(A, B, C):
-        # C: SVC hyper parameter to optimize for.
-        venus.set_mag_currents(A, B, C)
-        v = venus.get_beam_current()
-        return v
-    return black_box_function
 
 def try_kappa(kappa, bbf, n=10):
     best_list = []
@@ -57,16 +50,20 @@ def try_kappa(kappa, bbf, n=10):
         best_list.append(best)
     return best_list
 
-bbf = get_black_box_func(Venus(jitter=0.15, func=unnormalized_gpr))
-kappas = np.linspace(1.5, 4, 10)
+kappas = np.linspace(1, 8, 20)
 results = []
+results_dict = {}
 for kappa in tqdm(kappas):
-    best_list = try_kappa(kappa, bbf, n=n)
+    best_list = try_kappa(kappa, venus.bbf, n=n)
+    results_dict[kappa] = best_list
     results.append(sum(best_list)/len(best_list))
+
+with open('Results/kappa_exp%s_n%d_datanorm.pickle'%(exp_num, n), 'wb') as file:
+    pickle.dump(results_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
 
 plt.plot(kappas, results)
 plt.title("Average Best Achieved (Exp %s)"%exp_num)
 plt.xlabel("kappa")
 plt.ylabel("Best Beam Current (averaged over %d)"%n)
-plt.savefig("Graphs/kappa_exp%s_n%d.png"%(exp_num, n))
+plt.savefig("Graphs/kappa_exp%s_n%d_datanorm.png"%(exp_num, n))
 plt.show()

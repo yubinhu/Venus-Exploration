@@ -18,7 +18,7 @@ params = vars(args)
 
 run_num = params['run_num']
 
-X, y, X_var = loadXy("New Data/accumulated_weekend_data.h5", run_idx=run_num)
+X, y, X_var = loadXy("New Data/accumulated_weekend_data.h5", run_idx=run_num, use_datanorm=True)
 
 # hyper parameters
 lmin = 0.1
