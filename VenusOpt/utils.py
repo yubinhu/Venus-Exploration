@@ -18,7 +18,7 @@ MATERN_BEST_PARAMS = {
     '3':{"kernel__length_scale": 10, "kernel__nu": 0.5}
     }
 
-def get_scaler(xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], use_datanorm=True):
+def get_scaler(xcolumns=["mid_i_mean", "ext_i_mean","inj_i_mean"], use_datanorm=True):
     norm = {
         'inj_i_mean': lambda x: (x - 116.38956255790515) / (130.30950340857873 - 116.38956255790515),
         'ext_i_mean': lambda x: (x - 96.14013084998497) / (110.50552720289964 - 96.14013084998497),
@@ -31,6 +31,9 @@ def get_scaler(xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], use_datanorm
         'inj_i_mean': lambda x: (x - 122.59401936) / 3.34305675,
         'ext_i_mean': lambda x: (x - 104.08696283) / 3.45653727,
         'mid_i_mean': lambda x: (x - 102.52640418) / 3.00584971,
+        'inj_i_std': lambda x: x / 3.34305675,
+        'ext_i_std': lambda x: x / 3.45653727,
+        'mid_i_std': lambda x: x / 3.00584971,
         # 'gas_balzer_2_mean': lambda x: (x - 10.510574340820312) / (14.524067976535894 - 10.510574340820312),
         # 'bias_v_mean': lambda x: (x - 9.06360577314328) / (154.53849244729068 - 9.06360577314328),
     }
@@ -53,7 +56,7 @@ def get_scaler(xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], use_datanorm
     return x_scaler
 
 # full script for loadXy
-def loadXy(data_dir, old=False, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], ycolumns=["fcv1_i_mean"], use_datanorm=True):
+def loadXy(data_dir, old=False, run_idx="1", xcolumns=["mid_i_mean", "ext_i_mean","inj_i_mean"], scaleX=True, ycolumns=["fcv1_i_mean"], use_datanorm=True):
     """
     Utility function for the specific data format. Load and scale. 
     :param data_dir: directory to the data files
@@ -81,8 +84,8 @@ def loadXy(data_dir, old=False, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean
     if old==True:
         X_unscaled, y = loadXy_old(data_dir)
         # overwrite xcolumns
-        xcolumns = ["inj_i_mean", "ext_i_mean", "mid_i_mean"]
-        X_var = np.ones(X_unscaled.shape) * 0.0004372478183590247 # from the new data
+        xcolumns = ["mid_i_mean", "ext_i_mean", "inj_i_mean"]
+        X_std_unscaled = np.ones(X_unscaled.shape) * 0.01 # from the new data
     else:
         accumulated_data = pd.read_hdf(data_dir, "data")
         # extracting useful information
@@ -92,11 +95,18 @@ def loadXy(data_dir, old=False, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean
         
         X_unscaled = np.array(run_data[xcolumns])
         y = np.array(run_data[ycolumns]).squeeze() * 1e6
-        X_var = (np.array(run_data[x_std_columns]) ** 2).sum(axis=1) # X_var = X1_std**2 + X2_std**2 + ...
+        X_std_unscaled = np.array(run_data[x_std_columns])
 
+    if scaleX:
+        x_scaler = get_scaler(xcolumns, use_datanorm=use_datanorm)
+        X = x_scaler(X_unscaled)
+        x_std_scaler = get_scaler(x_std_columns, use_datanorm=use_datanorm)
+        X_std = x_std_scaler(X_std_unscaled)
+    else:
+        X = X_unscaled
+        X_std = X_std_unscaled
         
-    x_scaler = get_scaler(xcolumns, use_datanorm=use_datanorm)
-    X = x_scaler(X_unscaled)
+    X_var = (X_std ** 2).sum(axis=1) # X_var = X1_std**2 + X2_std**2 + ...
     
     # dimension check
     assert(X.shape[0]==y.shape[0])
