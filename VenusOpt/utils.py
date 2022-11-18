@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from VenusOpt.simulator import Venus
+import pickle
 
 RANDSTATE = 42
 
@@ -10,7 +11,14 @@ RBF_BEST_PARAMS = {
     '3':{"kernel__length_scale": 0.728}
     }
 
-def get_scaler(xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], use_datanorm=False):
+# based on exp results on old data with datanorm on Nov17 2022
+MATERN_BEST_PARAMS = {
+    '1':{"kernel__length_scale": 10, "kernel__nu": 0.5}, 
+    '2':{"kernel__length_scale": 10, "kernel__nu": 0.5}, 
+    '3':{"kernel__length_scale": 10, "kernel__nu": 0.5}
+    }
+
+def get_scaler(xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], use_datanorm=True):
     norm = {
         'inj_i_mean': lambda x: (x - 116.38956255790515) / (130.30950340857873 - 116.38956255790515),
         'ext_i_mean': lambda x: (x - 96.14013084998497) / (110.50552720289964 - 96.14013084998497),
@@ -31,20 +39,21 @@ def get_scaler(xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], use_datanorm
         # X: ndarray with shape (N, d) or (N, )
         if len(X.shape)==1:
             X = X[None, :]
-        N, d = X.shape
-        assert d==len(xcolumns), "Input has feature dimension %d instead of %d"%(X.shape[1], len(xcolumns))
+        _, d = X.shape
+        assert d==len(xcolumns), "Input has feature dimension %d instead of %d"%(d, len(xcolumns))
         X_scaled = np.zeros_like(X)
         for i in range(d):
-            if not use_datanorm:
-                X_scaled[:, i] = norm[xcolumns[i]](X[:, i])
-            else:
+            if use_datanorm:
                 X_scaled[:, i] = norm_from_data[xcolumns[i]](X[:, i])
+            else:
+                X_scaled[:, i] = norm[xcolumns[i]](X[:, i])
+        
         return X_scaled
         
     return x_scaler
 
 # full script for loadXy
-def loadXy(data_dir, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], ycolumns=["fcv1_i_mean"], use_datanorm=False):
+def loadXy(data_dir, old=False, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_mean"], ycolumns=["fcv1_i_mean"], use_datanorm=True):
     """
     Utility function for the specific data format. Load and scale. 
     :param data_dir: directory to the data files
@@ -66,21 +75,29 @@ def loadXy(data_dir, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_m
         "7.5": (1664737000, 1664810000),  # bias_v, gas_balzer_2
         "8": (1665180000, 1665405000),  # bias_v, gas_balzer_2
     }
-    x_scaler = get_scaler(xcolumns, use_datanorm=use_datanorm)
+    
 
     # reading data
-    accumulated_data = pd.read_hdf(data_dir, "data")
+    if old==True:
+        X_unscaled, y = loadXy_old(data_dir)
+        # overwrite xcolumns
+        xcolumns = ["inj_i_mean", "ext_i_mean", "mid_i_mean"]
+        X_var = np.ones(X_unscaled.shape) * 0.0004372478183590247 # from the new data
+    else:
+        accumulated_data = pd.read_hdf(data_dir, "data")
+        # extracting useful information
+        data = accumulated_data[time_column+input_columns+output_columns]
+        bounds = cuts[run_idx]
+        run_data = data[(data["unix_epoch_milliseconds_mean"]/1000 > bounds[0]) & (data["unix_epoch_milliseconds_mean"]/1000 <= bounds[1])]
+        
+        X_unscaled = np.array(run_data[xcolumns])
+        y = np.array(run_data[ycolumns]).squeeze() * 1e6
+        X_var = (np.array(run_data[x_std_columns]) ** 2).sum(axis=1) # X_var = X1_std**2 + X2_std**2 + ...
 
-    # extracting useful information
-    data = accumulated_data[time_column+input_columns+output_columns]
-    bounds = cuts[run_idx]
-    run_data = data[(data["unix_epoch_milliseconds_mean"]/1000 > bounds[0]) & (data["unix_epoch_milliseconds_mean"]/1000 <= bounds[1])]
-    run_data.describe()
-
-    X = x_scaler(np.array(run_data[xcolumns]))
-    y = np.array(run_data[ycolumns]).squeeze()
-    X_var = (np.array(run_data[x_std_columns]) ** 2).sum(axis=1) # X_var = X1_std**2 + X2_std**2 + ...
-
+        
+    x_scaler = get_scaler(xcolumns, use_datanorm=use_datanorm)
+    X = x_scaler(X_unscaled)
+    
     # dimension check
     assert(X.shape[0]==y.shape[0])
     assert(len(y.shape) == 1)
@@ -88,9 +105,31 @@ def loadXy(data_dir, run_idx="1", xcolumns=["inj_i_mean", "ext_i_mean", "mid_i_m
 
     return X, y, X_var
 
+def loadXy_old(data_dir):
+    """
+    Utility function for the specific data format.
+    :param data_dir: directory to the data files
+    :return: X, y
+    """
+
+    with open(data_dir, "rb") as fp:   # Unpickling
+        data_list = pickle.load(fp)
+
+    xpts, ypts, zpts, _, magpts = data_list
+
+    # check data
+    assert(len(xpts)==len(ypts) and len(xpts)==len(zpts) and len(xpts)==len(magpts))
+
+    # Transform the data into X, y form
+    X = np.array([xpts, ypts, zpts]).T
+    y = np.array(magpts)
+    return X, y
+
 # converters
 def gpr_to_venus(gpr, x_scaler, jitter=0.15):
     # Turns a normalized gpr into venus object. 
-    unnormalized_gpr = lambda arr: (gpr.predict((x_scaler(arr)).reshape(1,-1)) * 1e6)[0]
+
+    unnormalized_gpr = lambda arr: (gpr.predict((x_scaler(arr))))[0]
+
     venus = Venus(jitter=jitter, func=unnormalized_gpr)
     return venus

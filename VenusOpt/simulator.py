@@ -50,7 +50,7 @@ class Venus:
 
     def get_beam_current(self):
         """Read the current value of the beam current"""
-        return self.func(self.currents)
+        return self.func(self.currents.reshape(1, -1))
 
     def bbf(self, A, B, C):
         self.set_mag_currents(A, B, C)
