@@ -1,6 +1,7 @@
 # run this script from root directory
 from VenusOpt.simulator import Venus
 from VenusOpt.utils import get_scaler, loadXy, RBF_BEST_PARAMS, gpr_to_venus, MATERN_BEST_PARAMS
+from VenusOpt.model import generate_gpr_model
 from sklearn.gaussian_process.kernels import RBF, Matern
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.model_selection import cross_validate
@@ -25,20 +26,15 @@ exp_num = params['run_num']
 n = params['n']
 old_data = params['old_data']
 
+xcolumns=["mid_i_mean", "ext_i_mean","inj_i_mean"]
 datafile = "Data/data%s.pkl"%exp_num if old_data else "New Data/accumulated_weekend_data.h5"
-X, y, X_var = loadXy(datafile, old=old_data, run_idx=exp_num)
-X, y, X_var = shuffle(X,y,X_var)
 
-gpr = GaussianProcessRegressor(
-    kernel=Matern(), alpha=X_var.mean(), optimizer=None
-)
-gpr.set_params(**MATERN_BEST_PARAMS[exp_num])
-gpr.fit(X, y)
+gpr = generate_gpr_model(exp_num, datafile=datafile, xcolumns=xcolumns, old=old_data)
+x_scaler = get_scaler(xcolumns)
 
-x_scaler = get_scaler()
 venus = gpr_to_venus(gpr, x_scaler)
 
-pbounds = {"A": [97, 110], "B": [97, 110], "C": [116, 128]}
+pbounds = {"mid_i_mean": [97, 110], "ext_i_mean": [97, 110], "inj_i_mean": [116, 128]}
 
 def try_kappa(kappa, bbf, n=10, n_iter=10):
     best_list = []

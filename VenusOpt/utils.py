@@ -140,6 +140,5 @@ def gpr_to_venus(gpr, x_scaler, jitter=0.15):
     # Turns a normalized gpr into venus object. 
 
     unnormalized_gpr = lambda arr: (gpr.predict((x_scaler(arr))))[0]
-
     venus = Venus(jitter=jitter, func=unnormalized_gpr)
     return venus
