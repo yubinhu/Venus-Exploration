@@ -2,7 +2,7 @@
 *.csv
 *.png
 *.DS_Store
-!Graphs/*
+!Graphs/**
 !New Data/*
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -10,8 +10,8 @@ RBF_KERNEL = "rbf"
 
 def generate_gpr_model(exp_num, datafile="New Data/accumulated_weekend_data.h5", 
                        kernel=MATERN_KERNEL, xcolumns=["mid_i_mean", "ext_i_mean","inj_i_mean"],
-                       old=False, verbose=0):
-    X, y, X_var = loadXy(datafile, old=old, run_idx=exp_num, xcolumns=xcolumns)
+                       old=False, use_datanorm=True, verbose=0):
+    X, y, X_var = loadXy(datafile, old=old, run_idx=exp_num, xcolumns=xcolumns, use_datanorm=use_datanorm)
     X, y, X_var = shuffle(X,y,X_var)
 
     k = Matern() if kernel==MATERN_KERNEL else RBF()
