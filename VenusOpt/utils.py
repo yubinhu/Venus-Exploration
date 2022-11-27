@@ -18,7 +18,7 @@ MATERN_BEST_PARAMS = {
     '3':{"kernel__length_scale": 10, "kernel__nu": 0.5}
     }
 
-def get_scaler(xcolumns=["mid_i_mean", "ext_i_mean","inj_i_mean"], use_datanorm=True):
+def get_scaler(xcolumns=["mid_i_mean", "ext_i_mean","inj_i_mean"], use_datanorm=False):
     norm = {
         'inj_i_mean': lambda x: (x - 116.38956255790515) / (130.30950340857873 - 116.38956255790515),
         'ext_i_mean': lambda x: (x - 96.14013084998497) / (110.50552720289964 - 96.14013084998497),
@@ -75,7 +75,7 @@ def get_scaler(xcolumns=["mid_i_mean", "ext_i_mean","inj_i_mean"], use_datanorm=
     return x_scaler
 
 # full script for loadXy
-def loadXy(data_dir, old=False, run_idx="1", xcolumns=["mid_i_mean", "ext_i_mean","inj_i_mean"], scaleX=True, ycolumns=["fcv1_i_mean"], use_datanorm=True):
+def loadXy(data_dir, run_idx="1", xcolumns=["mid_i_mean", "ext_i_mean","inj_i_mean"], scaleX=True, ycolumns=["fcv1_i_mean"], use_datanorm=False, old=False):
     """
     Utility function for the specific data format. Load and scale. 
     :param data_dir: directory to the data files
@@ -155,9 +155,13 @@ def loadXy_old(data_dir):
     return X, y
 
 # converters
-def gpr_to_venus(gpr, x_scaler, jitter=0.15):
+def gpr_to_venus(gpr, x_scaler, jitter=0.15, gpr_input_dim=3):
     # Turns a normalized gpr into venus object. 
-
-    unnormalized_gpr = lambda arr: (gpr.predict((x_scaler(arr))))[0]
+    def unnormalized_gpr(arr):
+        if gpr_input_dim>3:
+            arr_zero_padded = np.pad(arr, (0, gpr_input_dim-3))
+            return (gpr.predict((x_scaler(arr_zero_padded))))[0]
+            
+        return (gpr.predict((x_scaler(arr))))[0]
     venus = Venus(jitter=jitter, func=unnormalized_gpr)
     return venus
