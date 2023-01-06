@@ -4,11 +4,11 @@ class Venus:
     # note: always set the func paramter
     def __init__(
         self,
-        inj_limits=[97, 110],
+        inj_limits=[116, 128],
         mid_limits=[97, 110],
-        ext_limits=[116, 128],
+        ext_limits=[97, 110],
         beam_range=[0.50, 1.00],
-        jitter=0, 
+        jitter=0.0, 
         func = (lambda X: -1)
     ):
         """The limits on the magnetic solenoids currents and the beam range (ouput).
@@ -50,10 +50,15 @@ class Venus:
 
     def get_beam_current(self):
         """Read the current value of the beam current"""
-        return self.func(self.currents.reshape(1, -1))
+        return self.func(self.currents.reshape(1, -1)) + self.rng.normal(0.0, self.jitter)
 
     def bbf(self, A, B, C):
         self.set_mag_currents(A, B, C)
+        v = self.get_beam_current()
+        return v
+    
+    def bbf_named(self, inj_i_mean, mid_i_mean, ext_i_mean):
+        self.set_mag_currents(inj_i_mean, mid_i_mean, ext_i_mean)
         v = self.get_beam_current()
         return v
 

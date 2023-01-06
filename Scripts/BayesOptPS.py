@@ -1,3 +1,5 @@
+# NOTE: this file is outdated. See BayesOpt.py for the latest version. 
+
 # run this script from root directory
 from VenusOpt.simulator import Venus
 from VenusOpt.utils import get_scaler, loadXy, RBF_BEST_PARAMS, gpr_to_venus, MATERN_BEST_PARAMS
