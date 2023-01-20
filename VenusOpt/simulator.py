@@ -21,13 +21,36 @@ class Venus:
         self.jitter = jitter
         self.rng = np.random.default_rng(42)
         self.func = func
+        self.time_cost = 0
+    
+    @staticmethod
+    def cost_fn_pure(present_currents, new_currents):
+        # return the time to set currents in seconds
+        # Time model subject to change. Wait on some inputs from Damon. 
+        # Bias change in a second, coils change in minutes
+        # Proposed model: max_i ( control_time_i )
+        # control_time_i = const_i * delta_i + plasma_term_i(delta_i)
+        # plasma_term_i is const or zero (depend on tolerance)
+        return np.linalg.norm(new_currents - present_currents) * 1.0
+    
+    def _cost_fn(self, present_currents, new_currents):
+        return self.cost_fn_pure(present_currents, new_currents) + self.rng.normal(0.0, self.jitter)
 
+    def get_total_time(self):
+        return self.time_cost
+    
     def set_mag_currents(self, inj, mid, ext):
         """Set the magnetic currents on the coils."""
         for v, lim in zip([inj, mid, ext], [self.inj_limits, self.mid_limits, self.ext_limits]):
             if v < lim[0] or v > lim[1]:
                 raise ValueError("Setting outside limits")
-        self.currents = np.array([inj, mid, ext])
+        
+        new_currents = np.array([inj, mid, ext])
+        
+        # calculate the time cost to set currents
+        self.time_cost += self._cost_fn(self.currents, new_currents)
+        
+        self.currents = new_currents
 
     def _rescale_inputs(self, inputs):
         """input to himmelblau4 must be in [-6, 6]."""
@@ -50,6 +73,7 @@ class Venus:
 
     def get_beam_current(self):
         """Read the current value of the beam current"""
+        self.time_cost += 60 # it takes 60 seconds to read the beam current
         return self.func(self.currents.reshape(1, -1)) + self.rng.normal(0.0, self.jitter)
 
     def bbf(self, A, B, C):
