@@ -1,0 +1,35 @@
+This directory has data from attempts to try to measure the amount of time
+it takes for changes to the various source parameters to settle through
+the system.  The files ??_change????.py were used to take the measurements.
+For example 02_change_balzer.py changed the oxygen balzer and watched to see
+how long it took for the changes to settle.  The numbers at the start are
+historic and don't have any meaning here.
+
+For all data sets the system was watched for ~20 seconds (50 system state
+measurements and 0.37 s gap after each measurement) before the change was 
+made.  The change was then made and the system was watched for 750 more 
+state measurements with 0.37 s gap between each (ensures slower than PLC 
+refresh rate so no duplicate measurements).  All the state data was written to
+files with names of the changed parameter followed by "_???" where ??? is
+a timestamp.  For all changed parameters EXCEPT the superconducting
+coils, measurements are taken immediately after the change request 
+was made.  For all these parameters the time to change is less than 
+a few seconds (this can be seen in the data), so it isn't important
+for the measurement of how long the system takes to settle.
+
+For the coils, however, the change time can be pretty long (~minute
+time scales in some instances).  For this reason the measurments for the
+coils were done slightly differently.  Again 50 measurements are taken 
+before the change request, then measurements are taken (with the same
+0.37 s gap after each) while the coils are changing, then 750 measurements
+are taken after the change has finished to watch the plasma settle.
+To indicate when this happens, a final column is added to the state data 
+file for the coils.  This final column is zero for the cases when the 
+coil change hasn't yet finished, and then is one after.  I realize in writing
+this now that this was not necessary as the last 750 points are after the
+change.
+
+NOTE: no-plasma drain current was high here too...~0.7-0.75 mA
+
+DST
+Tue 17 Jan 2023 08:32:44 AM PST

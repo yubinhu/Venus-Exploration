@@ -4,6 +4,7 @@
 *.DS_Store
 !Graphs/**
 !New Data/*
+Data/SettlingTimeExp/datafiles
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
