@@ -1,5 +1,8 @@
 import numpy as np
 from VenusOpt.cost import CostModel
+import json
+with open("Models/costmodel.json", "r") as f:
+    POPT_DICT = json.load(f)
 class Venus:
     # This is a Venus simulator
     # note: always set the func paramter
@@ -32,10 +35,20 @@ class Venus:
         # Proposed model: max_i ( control_time_i )
         # control_time_i = const_i * delta_i + plasma_term_i(delta_i)
         # plasma_term_i is const or zero (depend on tolerance)
-        deltas = {'inj': new_currents[0] - present_currents[0], 
-            'mid': new_currents[1] - present_currents[1], 
-            'ext': new_currents[2] - present_currents[2]}
-        return CostModel('Models/cost_model.json')(deltas)
+        if len(new_currents.shape) > 1:
+            # two dimensional array
+            costs = []
+            for i in range(len(new_currents)):
+                deltas = {'inj': new_currents[i][0] - present_currents[0], 
+                    'mid': new_currents[i][1] - present_currents[1], 
+                    'ext': new_currents[i][2] - present_currents[2]}
+                costs.append(CostModel(POPT_DICT)(deltas))
+            return np.array(costs)
+        else:
+            deltas = {'inj': new_currents[0] - present_currents[0], 
+                'mid': new_currents[1] - present_currents[1], 
+                'ext': new_currents[2] - present_currents[2]}
+            return CostModel(POPT_DICT)(deltas)
     
     def _cost_fn(self, present_currents, new_currents):
         return self.cost_fn_pure(present_currents, new_currents) + self.rng.normal(0.0, self.jitter)
