@@ -1,8 +1,12 @@
+# Fit the cost model to the settling time data
+
+from VenusOpt.cost import CostModel
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import medfilt
 from scipy.optimize import curve_fit
 import glob
+import json
 
 plt.rcParams['figure.dpi']=150
 plt.rcParams['font.family'] = 'Serif'
@@ -11,6 +15,7 @@ plt.rcParams['font.family'] = 'Serif'
 LAST_N = 500
 DATAFOLDER = "Data/SettlingTimeExp/datafiles/"
 IMAGEFOLDER = "Graphs/SettlingTime/"
+MODELFOLDER = "Models/"
 dataset_dict = {"inj" : 3, "ext": 4, "mid": 5}
 
 def load_tracking(name):
@@ -89,11 +94,6 @@ def stabilization_time(data, start_i=49):
         settle_times.append(settle_time)
     return settle_times
 
-# piece-wise linear function
-def linear_model(x, mn, mp, c):
-    y = np.piecewise(x, [x < 0, x >= 0], [lambda x: mn * x + c, lambda x: mp * x + c])
-    return y
-
 def analyze_coil(coil, savefig=True):
     dataset_num = dataset_dict[coil]
     data = get_raw_data(dataset_num)
@@ -105,10 +105,10 @@ def analyze_coil(coil, savefig=True):
     plt.xlabel("Set values (A)")
     plt.ylabel("Stabilization Time (s)")
 
-    popt, pcov = curve_fit(linear_model, set_values, stab_time) # , sigma=menStd
+    popt, pcov = curve_fit(CostModel.linear_model, set_values, stab_time) # , sigma=menStd
 
     x_plot = np.linspace(min(set_values), max(set_values), 1000)
-    plt.plot(x_plot, linear_model(x_plot, *popt), \
+    plt.plot(x_plot, CostModel.linear_model(x_plot, *popt), \
         label=r'$m_{neg}$=%.2f s/A, $m_{pos}$=%.2f s/A, c=%.2f s'%tuple(popt), c='r')
     plt.legend()
     plt.title(f"{coil} coil settling time")
@@ -116,9 +116,7 @@ def analyze_coil(coil, savefig=True):
         plt.savefig(IMAGEFOLDER+f"{coil}.png")
     plt.close()
     
-    return popt
-
-coil = "inj" # {"injection" : 3, "extraction": 4, "middle": 5}
+    return list(popt)
 
 popt_dict = {}
 for coil in dataset_dict.keys():
@@ -126,28 +124,11 @@ for coil in dataset_dict.keys():
     popt_dict[coil] = popt
     
 # dump as json
+with open(MODELFOLDER+"costmodel.json", "w") as f:
+    json.dump(popt_dict, f)
 
-def cost_model(deltas):
-    """Model that predicts settling time (s) of a change
 
-    Args:
-        deltas (dict): possible keys 
-            'inj', 'ext', 'mid' in units of A
-            'baz', in units of ??
-
-    Returns:
-        settling time: Unit s
-    """
-    
-    settling_time = 50
-    for key in deltas:
-        if key in dataset_dict.keys():
-            popt = popt_dict[key]
-            st = linear_model(deltas[key], *popt)
-            settling_time = max(settling_time, st)
-            
-    return settling_time
-
-deltas = {'inj':-1, 'ext':-1}
+cost_model = CostModel(popt_dict)
+deltas = {'inj':-4, 'ext':5}
 print(cost_model(deltas))
     

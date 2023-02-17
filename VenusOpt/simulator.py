@@ -1,4 +1,5 @@
 import numpy as np
+from VenusOpt.cost import CostModel
 class Venus:
     # This is a Venus simulator
     # note: always set the func paramter
@@ -31,7 +32,10 @@ class Venus:
         # Proposed model: max_i ( control_time_i )
         # control_time_i = const_i * delta_i + plasma_term_i(delta_i)
         # plasma_term_i is const or zero (depend on tolerance)
-        return np.linalg.norm(new_currents - present_currents) * 1.0
+        deltas = {'inj': new_currents[0] - present_currents[0], 
+            'mid': new_currents[1] - present_currents[1], 
+            'ext': new_currents[2] - present_currents[2]}
+        return CostModel('Models/cost_model.json')(deltas)
     
     def _cost_fn(self, present_currents, new_currents):
         return self.cost_fn_pure(present_currents, new_currents) + self.rng.normal(0.0, self.jitter)
