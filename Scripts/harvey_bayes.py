@@ -151,6 +151,10 @@ class Venus:
         Ifc = venus.read(['fcv1_i'])*1e6    # faraday cup current (single species current) in microamps
         return Ifc
 
+    def get_readvars(self):
+        venus = self.venus
+        return(venus.read_vars())
+
     def monitor(self,t_start,t_program_start,output_file,readvars,output_full):
         venus = self.venus
         Ifc = venus.read(['fcv1_i'])*1e6        # faraday cup current (single species current) in microamps
@@ -166,7 +170,7 @@ class Venus:
 
         # TODO: write to database or somewhere
         output_full.write("%.3f "%(venus.read([readvars[0]])))
-        for i in range(1,70):
+        for i in range(1,69):
             output_full.write("%.5e "%(venus.read([readvars[i]])))
         output_full.write("\n")
         output_file.write("%7.1f %12.3f %12.3f %10.4f %10.4f %8.2e %8.2e %7.2f %7.2f %7.2f %7.2f %7.1f\n"%(time.time()-t_start,
@@ -178,9 +182,8 @@ class Venus:
 
 venus = Venus()
 
-
 writefile = open('monitor_harvey_'+str(int(time.time())),'w')
-readvars = venus.read_vars()
+readvars = venus.get_readvars()
 writefilefull = open('monitor_full_'+str(int(time.time())),'w')
 t_program_start = time.time()
 
@@ -196,7 +199,6 @@ def black_box_function(A, B, C):
     #print('monitoring...')
     while time.time() < t_end:
         venus.monitor(t_start,t_program_start,writefile,readvars,writefilefull)
-        # TODO: check stable or low or predict where it asymptotic to. early terminate.
 
     t_end = time.time() + 10 # data acquisition for 10s
     v_list = []
@@ -212,7 +214,7 @@ def black_box_function(A, B, C):
     return v_mean - instability_cost
 
 pbounds = {"A": (120, 130), "B": (97, 110), "C": ( 95, 107)}
-optimizer = BayesianOptimization(f = black_box_function, pbounds = pbounds, verbose = 0, random_state = random_state)
+optimizer = BayesianOptimization(f = black_box_function, pbounds = pbounds, verbose = 0)
 noise = venus.get_noise_level()
 optimizer.maximize(init_points = 5, n_iter = 30, kappa=2, alpha=0.15, kernel__length_scale=10, kernel__nu=0.5) #
 print("Best result: {}; f(x) = {}.".format(optimizer.max["params"], optimizer.max["target"]))

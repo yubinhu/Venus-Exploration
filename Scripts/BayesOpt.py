@@ -1,28 +1,24 @@
 # run this script from root directory
-from VenusOpt.utils import get_scaler, loadXy, RBF_BEST_PARAMS, gpr_to_venus
+from VenusOpt.utils import get_scaler, gpr_to_venus
 from VenusOpt.model import generate_gpr_model
-import matplotlib.pyplot as plt
+from VenusOpt.cost import CostModel
 import argparse
-import pickle
 from bayes_opt.logger import JSONLogger
 from bayes_opt.event import Events
 import time
-import numpy as np
 
 from bayes_opt import BayesianOptimization, UtilityFunction
 
 # handle command line inputs
 parser = argparse.ArgumentParser()
 parser.add_argument('--run_num', type=str, default='1')
-parser.add_argument('--n', type=int, default=10) 
 parser.add_argument('--n_iter', type=int, default=30)
-parser.add_argument('--old_data', type=bool, default=False) 
+parser.add_argument('--old_data', type=bool, default=False)
 parser.add_argument('--acq', type=str, default='ei') # {'ucb', 'ei', 'eipu'}
 args = parser.parse_args()
 params = vars(args)
 
 exp_num = params['run_num']
-# n = params['n']
 old_data = params['old_data']
 acq = params['acq']
 n_iter = params['n_iter']
@@ -50,10 +46,10 @@ logger = JSONLogger(path=logfile)
 optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)
 
 eps = 1e-8
-cost_function = venus.cost_fn_pure
+cost_function = CostModel.currents_to_cost
 
-acq_func = UtilityFunction(kind=acq, kappa=2.5, xi=0.01, kappa_decay=1, kappa_decay_delay=0, cost_func=cost_function)
-optimizer.set_gp_params(alpha=0.15)
+acq_func = UtilityFunction(kind=acq, kappa=2, xi=0.01, kappa_decay=1, kappa_decay_delay=0, cost_func=cost_function)
+optimizer.set_gp_params(alpha=0.15, kernel__length_scale=10, kernel__nu=0.5)
 optimizer.maximize(init_points = 5, n_iter = n_iter, acquisition_function=acq_func)
 best = optimizer.max["target"]
 print("best", best)
