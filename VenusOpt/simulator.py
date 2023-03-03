@@ -26,6 +26,7 @@ class Venus:
         self.rng = np.random.default_rng(42)
         self.func = func
         self.time_cost = 0
+        self.logs = []
     
     def _cost_fn(self, present_currents, new_currents):
         return CostModel.currents_to_cost(present_currents, new_currents) + self.rng.normal(0.0, self.jitter)
@@ -68,7 +69,11 @@ class Venus:
     def get_beam_current(self):
         """Read the current value of the beam current"""
         self.time_cost += 60 # it takes 60 seconds to read the beam current
-        return self.func(self.currents.reshape(1, -1)) + self.rng.normal(0.0, self.jitter)
+        beam_current = self.func(self.currents.reshape(1, -1)) + self.rng.normal(0.0, self.jitter)
+        # log mag_currents, beam_current, time_cost as a single named dictionary
+        self.logs.append({"inj_i_mean": self.currents[0], "mid_i_mean": self.currents[1], 
+                         "ext_i_mean": self.currents[2], "beam_current": beam_current, "time_cost": self.time_cost})
+        return beam_current
 
     def bbf(self, A, B, C):
         self.set_mag_currents(A, B, C)
@@ -79,6 +84,9 @@ class Venus:
         self.set_mag_currents(inj_i_mean, mid_i_mean, ext_i_mean)
         v = self.get_beam_current()
         return v
+    
+    def dump_log(self, logfile="log.json"):
+        json.dump(self.logs, open(logfile, "w"))
 
     @staticmethod
     def _simple_square(w, x, y):

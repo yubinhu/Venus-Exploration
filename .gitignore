@@ -4,6 +4,8 @@
 *.DS_Store
 !Graphs/**
 !New Data/*
+Data/Simulations2/
+Data/Simulations/
 Data/SettlingTimeExp/datafiles
 # Byte-compiled / optimized / DLL files
 __pycache__/

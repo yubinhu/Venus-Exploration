@@ -10,6 +10,7 @@ import datetime
 import time
 import statistics
 from VenusOpt.cost import CostModel
+import json
 
 
 from bayes_opt import BayesianOptimization, UtilityFunction
@@ -38,7 +39,7 @@ class Venus:
         self.rng = np.random.default_rng(42)
 
         self.venus = venusplc.VENUSController(read_only=False)
-
+        self.logs = []
 
     def change_superconductors(self, Igoal):
         venus = self.venus
@@ -118,7 +119,6 @@ class Venus:
             checkdone[:,:-1] = checkdone[:,1:]; checkdone[:,-1]=np.abs(Inow-Igoal)
         #print('done setting field ')
 
-
     def set_mag_currents(self, inj, ext, mid):
         """Set the magnetic currents on the coils."""
         for v, lim in zip([inj, ext, mid], [self.inj_limits, self.ext_limits, self.mid_limits]):
@@ -150,7 +150,12 @@ class Venus:
         """Read the current value of the beam current"""
         venus = self.venus
         Ifc = venus.read(['fcv1_i'])*1e6    # faraday cup current (single species current) in microamps
+        self.logs.append({"inj_i_mean": self.currents[0], "mid_i_mean": self.currents[2], 
+                         "ext_i_mean": self.currents[1], "beam_current": Ifc, "time_cost": self.time_cost})
         return Ifc
+    
+    def dump_log(self, logfile="log.json"):
+        json.dump(self.logs, open(logfile, "w"))
 
     def get_readvars(self):
         venus = self.venus
@@ -179,7 +184,7 @@ class Venus:
             venus.read(['inj_mbar']),venus.read(['ext_mbar']),venus.read(['inj_i']),venus.read(['ext_i']),venus.read(['mid_i']),
             venus.read(['sext_i']),venus.read(['x_ray_source'])))
         #time.sleep(1)
-
+        return Ifc
 
 venus = Venus()
 
@@ -191,6 +196,7 @@ t_program_start = time.time()
 # defining a cost function. Input rel_std. Output is in scale to std of mean of beam currrent
 squared = lambda x: 0.5*(20*x)**2
 BEAM_CURR_STD = 30
+BEST_SCORE = 0
 
 # Define the black box function to optimize.
 def black_box_function(inj, mid, ext):
@@ -201,6 +207,8 @@ def black_box_function(inj, mid, ext):
     #print('monitoring...')
     while time.time() < t_end:
         venus.monitor(t_start,t_program_start,writefile,readvars,writefilefull)
+        # TODO: add early terminateion function here
+        
 
     t_end = time.time() + 10 # data acquisition for 10s
     v_list = []
@@ -213,7 +221,9 @@ def black_box_function(inj, mid, ext):
     instability_cost = squared(rel_std) * BEAM_CURR_STD
     # save the v list?
     print('average current for 10 s: ',v_mean)
-    return v_mean - instability_cost
+    score = v_mean - instability_cost
+    BEST_SCORE = max(score, BEST_SCORE)
+    return score
 
 cost_function = CostModel.currents_to_cost
 
@@ -221,10 +231,12 @@ pbounds = {"inj": (120, 130), "ext": (97, 110), "mid": ( 95, 107)}
 optimizer = BayesianOptimization(f = black_box_function, pbounds = pbounds, verbose = 0, 
                                  allow_duplicate_points=True)
 
-acq_func = UtilityFunction(kind='eipu', kappa=2, xi=0.01, kappa_decay=1, kappa_decay_delay=0, cost_func=cost_function)
+acq = "eipu" # possible values: {"eipu", "ei", "ucb", ...}
+acq_func = UtilityFunction(kind=acq, kappa=2, xi=0.01, kappa_decay=1, kappa_decay_delay=0, cost_func=cost_function)
 optimizer.set_gp_params(alpha=0.15, kernel__length_scale=10, kernel__nu=0.5)
 
 noise = venus.get_noise_level()
 optimizer.maximize(init_points = 5, n_iter = 30, acquisition_function=acq_func) #
 print("Best result: {}; f(x) = {}.".format(optimizer.max["params"], optimizer.max["target"]))
-
+logfile = "Data/Experiments/logs_%s_%s.json" % (acq, time.strftime("%d-%m-%Y_%H-%M-%S"))
+venus.dump_log(logfile)
