@@ -3,7 +3,10 @@ from VenusOpt.cost import CostModel
 import json
 with open("Models/costmodel.json", "r") as f:
     POPT_DICT = json.load(f)
-class Venus:
+    
+
+
+class VenusSimulator:
     # This is a Venus simulator
     # note: always set the func paramter
     def __init__(

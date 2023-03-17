@@ -1,5 +1,5 @@
 # run this script from root directory
-from VenusOpt.simulator import Venus
+from VenusOpt.simulator import VenusSimulator
 from VenusOpt.utils import get_scaler, loadXy, RBF_BEST_PARAMS, gpr_to_venus, MATERN_BEST_PARAMS
 from VenusOpt.model import generate_gpr_model
 import numpy as np

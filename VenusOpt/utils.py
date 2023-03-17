@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from VenusOpt.simulator import Venus
+from VenusOpt.simulator import VenusSimulator
 import pickle
 
 RANDSTATE = 42
@@ -163,5 +163,5 @@ def gpr_to_venus(gpr, x_scaler, jitter=0.15, gpr_input_dim=3):
             return (gpr.predict((x_scaler(arr_zero_padded))))[0]
             
         return (gpr.predict((x_scaler(arr))))[0]
-    venus = Venus(jitter=jitter, func=unnormalized_gpr)
+    venus = VenusSimulator(jitter=jitter, func=unnormalized_gpr)
     return venus

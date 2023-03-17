@@ -9,6 +9,8 @@ import numpy as np
 import datetime
 import time
 import statistics
+from VenusOpt.cost import CostModel
+import json
 
 
 from bayes_opt import BayesianOptimization, UtilityFunction
@@ -20,7 +22,8 @@ import venus_data_utils.venusplc as venusplc
 #import plcauto.dbwriter as dbwriter
 #import plcauto.maths as maths
 
-class Venus:
+class VenusController:
+    # Wrapper class for controlling the venusplc
     
     def __init__(
         self,
@@ -36,11 +39,11 @@ class Venus:
         self.currents = np.zeros(3)
         self.rng = np.random.default_rng(42)
 
-        self.venus = venusplc.VENUSController(read_only=False)
-
+        self.device = venusplc.VENUSController(read_only=False)
+        self.logs = []
 
     def change_superconductors(self, Igoal):
-        venus = self.venus
+        venus = self.device
         time_start_change = time.time()
         usefastdiff = 0.1  # only use the fast search if the difference between current and goal is > this amount
         Inow=np.array([venus.read(['inj_i']),venus.read(['ext_i']),venus.read(['mid_i'])])   # current currents
@@ -63,9 +66,6 @@ class Venus:
             if direction[i]>0: Ioff[i]=Ioff[i]-direction[i]*diffup[i]
             if direction[i]<0: Ioff[i]=Ioff[i]-direction[i]*diffdown[i]
 
-        #print('\nin change:\nInow=',Inow)
-        #print('Iaim',Iaim)
-        #print('Ioff',Ioff)
 
         checkdone = np.zeros((3,40))+5.0
 
@@ -76,13 +76,10 @@ class Venus:
         def check_done(done,Inow,Igoal,Ioff):
             if done[0]==0 and direction[0]*(Inow[0]-Ioff[0])>0:
                 venus.write({'inj_i':Igoal[0]}); done[0]=1
-                #print('inj to goal:',done,' Inow:',Inow[0],' Igoal:',Igoal[0])
             if done[1]==0 and direction[1]*(Inow[1]-Ioff[1])>0:
                 venus.write({'ext_i':Igoal[1]}); done[1]=1
-                #print('ext to goal:',done,' Inow:',Inow[1],' Igoal:',Igoal[1])
             if done[2]==0 and direction[2]*(Inow[2]-Ioff[2])>0:
                 venus.write({'mid_i':Igoal[2]}); done[2]=1
-                #print('mid to goal:',done,' Inow:',Inow[2],' Igoal:',Igoal[2])
             return(done)
 
         names=['inj_i','ext_i','mid_i']
@@ -91,32 +88,20 @@ class Venus:
             for i in range(5):
                 time.sleep(0.1)
                 Inow=np.array([venus.read(['inj_i']),venus.read(['ext_i']),venus.read(['mid_i'])])   # current currents
-#                print("%4.0f: %i %6.2f %6.2f %6.2f %6.2f || %i %6.2f %6.2f %6.2f %6.2f || %i %6.2f %6.2f %6.2f %6.2f"%(
-#                    time.time()-time_start_change,int(done[0]),Inow[0],Igoal[0],Ioff[0],np.sum(checkdone[0,:])/diffall, 
-#                    int(done[1]),Inow[1],Igoal[1],Ioff[1],np.sum(checkdone[1,:])/diffall,
-#                    int(done[2]),Inow[2],Igoal[2],Ioff[2],np.sum(checkdone[2,:])/diffall))
                 done = check_done(done,Inow,Igoal,Ioff)
 
             if time.time()-time_start_change >300.0:
-                #print('!!!!!!!!!  timed out !!!!!!!')
-                #print('trying to set',Igoal)
-                #print('got stuck at ',venus.read(['inj_i']),venus.read(['ext_i']),venus.read(['mid_i']))   # current currents
                 Inow=np.array([venus.read(['inj_i']),venus.read(['ext_i']),venus.read(['mid_i'])])   # current currents
                 for i in range(3):
-                    #print('in here. i=%i, Inow[i]=%f, Igoal[i]=%f, done[i]=%i'%(i,Inow[i],Igoal[i],done[i]))
                     if np.abs(Inow[i]-Igoal[i])<0.08 and done[i]==0:   # for small change problem
                         Igoal[i]=Igoal[i]-.01*np.sign(Inow[i]-Igoal[i])
                         venus.write({names[i]:Igoal[i]})
-                        #print('stuck with small difference.  resetting Igoal')
                         time_start_change=time.time()
                     if np.abs(Inow[i]-Igoal[i])>=0.08:   # for some reason done going to 1 but not changing I goal
                         done[i]=0
                         venus.write({names[i]:Igoal[i]})
-                        #print('stuck with big difference. re-requesting Igoal')
                         time_start_change=time.time()
             checkdone[:,:-1] = checkdone[:,1:]; checkdone[:,-1]=np.abs(Inow-Igoal)
-        #print('done setting field ')
-
 
     def set_mag_currents(self, inj, ext, mid):
         """Set the magnetic currents on the coils."""
@@ -124,7 +109,7 @@ class Venus:
             if v < lim[0] or v > lim[1]:
                 raise ValueError("Setting outside limits")
         # self.currents = np.array([inj, mid, ext])
-        venus = self.venus
+        venus = self.device
 
         if 0: # dst: hiding these and using the faster change Superconductors program
             venus.write({'inj_i':inj})         # injection solenoid current [A]
@@ -133,11 +118,11 @@ class Venus:
         self.change_superconductors(np.array([inj,ext,mid]))
 
     def change_something(self, thing, value):
-        venus = self.venus
+        venus = self.device
         venus.write({thing:value})
 
     def read_something(self, thing):
-        venus = self.venus
+        venus = self.device
         return(venus.read([thing]))
 
     def get_noise_level(self):
@@ -155,16 +140,19 @@ class Venus:
     
     def get_beam_current(self):
         """Read the current value of the beam current"""
-        venus = self.venus
+        venus = self.device
         Ifc = venus.read(['fcv1_i'])*1e6    # faraday cup current (single species current) in microamps
         return Ifc
+    
+    def dump_log(self, logfile="log.json"):
+        json.dump(self.logs, open(logfile, "w"))
 
     def get_readvars(self):
-        venus = self.venus
+        venus = self.device
         return(venus.read_vars())
 
     def monitor(self,t_start,t_program_start,output_file,readvars,output_full):
-        venus = self.venus
+        venus = self.device
         Ifc = venus.read(['fcv1_i'])*1e6        # faraday cup current (single species current) in microamps
         Idrain = venus.read(['extraction_i'])   # drain current ~ total extracted beam current [mA]
         Pinj = venus.read(['inj_mbar'])         # injection pressure [torr]
@@ -187,8 +175,7 @@ class Venus:
             venus.read(['sext_i']),venus.read(['x_ray_source']),venus.read(['bias_v']),venus.read(['gas_balzer_2'])))
         #time.sleep(1)
 
-
-venus = Venus()
+venus = VenusController()
 
 basedir = '/home/damon/Venus-Exploration/Scripts/20230306_bayes_cost_weighting/'
 writefile = open(basedir+'data/monitor_harvey_'+str(int(time.time())),'w')
@@ -201,7 +188,8 @@ squared = lambda x: 0.5*(20*x)**2
 BEAM_CURR_STD = 30
 
 # Define the black box function to optimize.
-def black_box_function(mid,balzer,bias):
+#def black_box_function(inj, mid, ext):  #Harvey
+def black_box_function(mid, balzer, bias):  #Harvey
     mid0 = venus.read_something('mid_i')
     balzer0 = venus.read_something('gas_balzer_2')
     bias0 = venus.read_something('bias_v')
@@ -219,9 +207,9 @@ def black_box_function(mid,balzer,bias):
         venus.monitor(t_start,t_program_start,writefile,readvars,writefilefull)
         time.sleep(0.37)
 
-    # dst  t_end = time.time() + 10 # data acquisition for 10s
+    # dst t_end = time.time() + 10 # data acquisition for 10s
     v_list = []
-    #dst while time.time() < t_end:
+    # dst while time.time() < t_end:
     for i in range(25):
         v = venus.get_beam_current()
         v_list.append(v)
@@ -234,9 +222,16 @@ def black_box_function(mid,balzer,bias):
     print(f'average and rel_std*100 current for 25 measurements: {v_mean:.2f} {rel_std*100.:.2f}')
     return v_mean - instability_cost
 
-pbounds = {"mid": (149, 155),"balzer": (12.5, 13.5),"bias": (25.0,80.0)}
-optimizer = BayesianOptimization(f = black_box_function, pbounds = pbounds, verbose = 0)
+cost_function = CostModel.currents_to_cost
+
+pbounds = {"mid": (149, 155), "balzer": (12.5,13.5), "bias":(25.0,80.0)}
+optimizer = BayesianOptimization(f = black_box_function, pbounds = pbounds, verbose = 0, 
+                                 allow_duplicate_points=True)
+
+acq_func = UtilityFunction(kind='eipu', kappa=2, xi=0.01, kappa_decay=1, kappa_decay_delay=0, cost_func=cost_function)
+optimizer.set_gp_params(alpha=0.15, kernel__length_scale=10, kernel__nu=0.5)
+
 noise = venus.get_noise_level()
-optimizer.maximize(init_points = 5, n_iter = 30, kappa=2, alpha=0.15, kernel__length_scale=10, kernel__nu=0.5) #
+optimizer.maximize(init_points = 5, n_iter = 30, acquisition_function=acq_func) #
 print("Best result: {}; f(x) = {}.".format(optimizer.max["params"], optimizer.max["target"]))
 
