@@ -27,10 +27,9 @@ class Venus:
         self.func = func
         self.time_cost = 0
         self.logs = []
+        self.CostModel = CostModel(POPT_DICT)
+        self.CostFunction = self.CostModel.build_cost_function(["inj", "mid", "ext"])
     
-    def _cost_fn(self, present_currents, new_currents):
-        return CostModel.currents_to_cost(present_currents, new_currents) + self.rng.normal(0.0, self.jitter)
-
     def get_total_time(self):
         return self.time_cost
     
@@ -43,8 +42,8 @@ class Venus:
         new_currents = np.array([inj, mid, ext])
         
         # calculate the time cost to set currents
-        self.time_cost += self._cost_fn(self.currents, new_currents)
-        
+        step_time = self.CostFunction(self.currents, new_currents) + self.rng.normal(0.0, self.jitter)
+        self.time_cost += step_time
         self.currents = new_currents
 
     def _rescale_inputs(self, inputs):

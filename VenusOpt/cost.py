@@ -5,10 +5,8 @@ and rename it to CostModel.currents_to_cost()
 It should load the POPT_DICT from "Models/costmodel.json"
 It should have the function
 """
+from typing import List
 import numpy as np
-import json
-with open("Models/costmodel.json", "r") as f:
-    POPT_DICT = json.load(f) # default cost model
 
 class CostModel:
     def __init__(self, popt_dict):
@@ -33,27 +31,34 @@ class CostModel:
                 settling_time = max(settling_time, st)
         return settling_time
     
+    def build_cost_function(self, parameters:List[str]):
+        """Build a static cost function for the given parameters
+        Args:
+            parameters (List[str]): List of parameters to include in the cost function. 
+                Possible values are 'inj', 'ext', 'mid', 'baz1', 'baz2', 'bias'.
+                Order is important, as it determines the meaning of each entries in the
+                cost function input array.
+        Returns:
+            cost_function: A static function that takes a numpy array and returns 
+                a cost according to the cost model
+        """
+        def cost_function(old, new):
+            # assert len(old) == len(new)
+            # assert len(old) == len(parameters)
+            if len(old.shape) > 1:
+                res = []
+                for i in range(len(old)):
+                    res.append(cost_function(old[i], new[i]))
+                return np.array(res)
+            else:
+                d = {}
+                for i in range(len(old)):
+                    d[parameters[i]] = new[i] - old[i]
+                return self(d)
+        return cost_function
+    
     # piece-wise linear function
     @staticmethod
     def linear_model(x, mn, mp, c):
         y = np.piecewise(x, [x < 0, x >= 0], [lambda x: mn * x + c, lambda x: mp * x + c])
         return y
-    
-    @staticmethod
-    def currents_to_cost(present_currents, new_currents):
-        # return the time to set currents in seconds. Use default cost model. 
-        # present_currents = [inj, mid, ext]
-        if len(new_currents.shape) > 1:
-            # two dimensional array
-            costs = []
-            for i in range(len(new_currents)):
-                deltas = {'inj': new_currents[i][0] - present_currents[0], 
-                    'mid': new_currents[i][1] - present_currents[1], 
-                    'ext': new_currents[i][2] - present_currents[2]}
-                costs.append(CostModel(POPT_DICT)(deltas))
-            return np.array(costs)
-        else:
-            deltas = {'inj': new_currents[0] - present_currents[0], 
-                'mid': new_currents[1] - present_currents[1], 
-                'ext': new_currents[2] - present_currents[2]}
-            return CostModel(POPT_DICT)(deltas)

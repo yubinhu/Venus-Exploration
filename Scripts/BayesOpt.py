@@ -46,9 +46,12 @@ for _ in range(repeat):
                                     random_state = random_state, allow_duplicate_points=True)
 
     logfile = "Data/Simulations2/logs_%s_%s.json" % (acq, time.strftime("%d-%m-%Y_%H-%M-%S"))
-
-    eps = 1e-8
-    cost_function = CostModel.currents_to_cost
+    
+    import json
+    with open("Models/costmodel.json", "r") as f:
+        POPT_DICT = json.load(f) # default cost model
+    cost_model = CostModel(POPT_DICT)
+    cost_function = cost_model.build_cost_function(["inj_i_mean", "mid_i_mean", "ext_i_mean"])
 
     acq_func = UtilityFunction(kind=acq, kappa=2, xi=0.01, kappa_decay=1, kappa_decay_delay=0, cost_func=cost_function)
     optimizer.set_gp_params(alpha=0.15, kernel__length_scale=10, kernel__nu=0.5)
