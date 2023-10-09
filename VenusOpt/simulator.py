@@ -1,8 +1,16 @@
 import numpy as np
 from VenusOpt.cost import CostModel
 import json
-with open("Models/costmodel.json", "r") as f:
+import os
+# get the folder the current file is in
+THIS_FILE = os.path.dirname(os.path.abspath(__file__))
+
+# read ../Models/costmodel.json
+with open(os.path.join(THIS_FILE, "../Models/costmodel.json"), "r") as f:
     POPT_DICT = json.load(f)
+
+# with open("Models/costmodel.json", "r") as f:
+#     POPT_DICT = json.load(f)
     
 
 
@@ -40,7 +48,7 @@ class VenusSimulator:
         """Set the magnetic currents on the coils."""
         for v, lim in zip([inj, mid, ext], [self.inj_limits, self.mid_limits, self.ext_limits]):
             if v < lim[0] or v > lim[1]:
-                raise ValueError("Setting outside limits")
+                raise ValueError(f"Setting outside limits. Trying to set current with limits {lim} to {v}")
         
         new_currents = np.array([inj, mid, ext])
         
