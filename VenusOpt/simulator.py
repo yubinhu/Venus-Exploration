@@ -1,10 +1,12 @@
 import numpy as np
 from VenusOpt.cost import CostModel
 import json
-with open("Models/costmodel.json", "r") as f:
-    POPT_DICT = json.load(f)
-    
+from pathlib import Path
 
+current_file = Path(__file__).resolve()
+json_path = current_file.parent.parent / 'Models' / 'costmodel.json'
+with json_path.open('r') as f:
+    POPT_DICT = json.load(f)
 
 class VenusSimulator:
     # This is a Venus simulator
